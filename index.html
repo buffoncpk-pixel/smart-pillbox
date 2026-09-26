@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartPill 智慧藍牙藥盒</title>
+<style>
+  :root {
+    --primary: #2563eb;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --card-bg: #ffffff;
+    --text: #1f2937;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft JhengHei", sans-serif;
+    background: #f8fafc;
+    color: var(--text);
+    margin: 0;
+    padding: 16px;
+  }
+  .container { max-width: 680px; margin: 0 auto; }
+  .header {
+    background: linear-gradient(135deg, #1e40af, #3b82f6);
+    color: white;
+    padding: 24px;
+    border-radius: 16px;
+    box-shadow: 0 8px 20px rgba(37,99,235,0.2);
+    margin-bottom: 20px;
+  }
+  .header h1 { margin: 0 0 10px 0; font-size: 24px; display: flex; align-items: center; gap: 8px; }
+  .clock-box { font-size: 14px; opacity: 0.95; line-height: 1.6; }
+  .clock-time { font-size: 28px; font-weight: bold; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
+  
+  .ble-bar {
+    background: white;
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .ble-status { font-weight: bold; font-size: 14px; }
+  .ble-btn {
+    background: #0284c7;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .ble-btn:hover { background: #0369a1; }
+
+  .grid-days { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 20px; }
+  @media(min-width: 600px) { .grid-days { grid-template-columns: 1fr 1fr; } }
+  .day-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .day-title { font-weight: 700; color: #334155; margin-bottom: 12px; border-bottom: 2px solid #f1f5f9; padding-bottom: 6px; }
+  .slot-item {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-left: 4px solid #cbd5e1;
+    transition: all 0.3s;
+  }
+  .slot-item.taken { border-left-color: var(--success); background: #f0fdf4; }
+  .slot-item.alert { border-left-color: var(--warning); background: #fffbeb; }
+  .slot-item.overdue { border-left-color: var(--danger); background: #fef2f2; animation: pulse 1.5s infinite; }
+  .slot-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 13px; font-weight: 600; }
+  .badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; }
+  .badge-taken { background: #dcfce7; color: #166534; }
+  .badge-pending { background: #f1f5f9; color: #475569; }
+  .badge-alert { background: #fef3c7; color: #92400e; }
+  .badge-overdue { background: #fee2e2; color: #991b1b; }
+  .input-row { display: flex; gap: 6px; }
+  input[type="date"], input[type="time"], input[type="number"] {
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 13px;
+    background: white;
+  }
+  .config-card {
+    background: var(--card-bg);
+    padding: 18px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 20px;
+  }
+  .btn-submit {
+    width: 100%;
+    background: var(--primary);
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(37,99,235,0.25);
+  }
+  .btn-submit:hover { background: #1d4ed8; }
+  .btn-reset {
+    width: 100%;
+    background: #64748b;
+    color: white;
+    font-size: 14px;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  .hint-text { font-size: 12px; color: #64748b; margin-top: 4px; }
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.01); box-shadow: 0 0 10px rgba(239,68,68,0.3); }
+    100% { transform: scale(1); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>💊 SmartPill 智慧聯網藥盒</h1>
+    <div class="clock-box">
+      <span id="curDate">--年--月--日</span> (<span id="curWeek">--</span>)<br>
+      <div class="clock-time" id="curTime">--:--:--</div>
+    </div>
+  </div>
+
+  <!-- 藍牙連線控制列 -->
+  <div class="ble-bar">
+    <div>
+      <div style="font-size: 12px; color: #64748b;">裝置連線狀態</div>
+      <div id="bleStatusText" class="ble-status" style="color: #ef4444;">🔴 尚未連線藥盒</div>
+    </div>
+    <button type="button" class="ble-btn" id="btnConnect" onclick="toggleConnect()">🔍 搜尋並連接藥盒</button>
+  </div>
+
+  <div class="config-card">
+    <label style="font-weight: 600; font-size: 14px;">⏱️ 超時未服提醒：</label>
+    <span style="font-size: 13px; color: #64748b;">時間到達後超過</span>
+    <input type="number" id="tolerance" min="1" max="60" value="1" style="width: 60px;">
+    <span style="font-size: 13px; color: #64748b;">分鐘未服，將啟動警報</span>
+    <div class="hint-text">💡 提示：更改「第 1 天」日期時，系統會自動順延第 2~4 天日程！</div>
+  </div>
+
+  <div class="grid-days" id="daysContainer"></div>
+
+  <button type="button" class="btn-submit" onclick="sendScheduleToESP32()">💾 傳送並儲存排程至藥盒</button>
+  <button type="button" class="btn-reset" onclick="sendResetToESP32()">🔄 重設全部日程時間與服藥狀態（新週期）</button>
+</div>
+
+<script>
+// ========== Web Bluetooth UUID 定義 ==========
+const SERVICE_UUID           = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+const CHARACTERISTIC_UUID_RX = "beb5483e-36e1-4688-b7f5-ea07361b26a8"; // 寫入 ESP32
+const CHARACTERISTIC_UUID_TX = "beb5483e-36e1-4688-b7f5-ea07361b26a9"; // 接收 Notify
+
+let bleDevice = null;
+let rxCharacteristic = null;
+let txCharacteristic = null;
+
+// 時鐘更新（使用本機/手機時間）
+function updateLocalClock() {
+  const now = new Date();
+  const weekDays = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mi = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+
+  document.getElementById('curDate').innerText = `${yyyy}年${mm}月${dd}日`;
+  document.getElementById('curWeek').innerText = weekDays[now.getDay()];
+  document.getElementById('curTime').innerText = `${hh}:${mi}:${ss}`;
+}
+setInterval(updateLocalClock, 1000);
+updateLocalClock();
+
+// 日期加減計算
+function addDays(dateStr, days) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  d.setDate(d.getDate() + days);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function onDay1DateChanged() {
+  const baseDate = document.getElementById('d0').value;
+  if (!baseDate) return;
+  document.getElementById('d1').value = baseDate;
+  document.getElementById('d2').value = addDays(baseDate, 1);
+  document.getElementById('d3').value = addDays(baseDate, 1);
+  document.getElementById('d4').value = addDays(baseDate, 2);
+  document.getElementById('d5').value = addDays(baseDate, 2);
+  document.getElementById('d6').value = addDays(baseDate, 3);
+  document.getElementById('d7').value = addDays(baseDate, 3);
+}
+
+// 動態建立 8 格卡片
+function initUI() {
+  const container = document.getElementById('daysContainer');
+  container.innerHTML = '';
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+
+  for (let d = 0; d < 4; d++) {
+    let card = document.createElement('div');
+    card.className = 'day-card';
+    card.innerHTML = `<div class="day-title">第 ${d+1} 天日程</div>`;
+    
+    for (let t = 0; t < 2; t++) {
+      let idx = d * 2 + t;
+      let targetDate = addDays(todayStr, d);
+      let targetTime = (t === 0) ? "08:00" : "20:00";
+
+      let item = document.createElement('div');
+      item.id = `slot-box-${idx}`;
+      item.className = 'slot-item';
+      item.innerHTML = `
+        <div class="slot-header">
+          <span>第 ${t+1} 次 (LED ${idx+1})</span>
+          <span id="badge-${idx}" class="badge badge-pending">排程等待中</span>
+        </div>
+        <div class="input-row">
+          <input type="date" id="d${idx}" value="${targetDate}" required>
+          <input type="time" id="t${idx}" value="${targetTime}" required>
+        </div>
+      `;
+      card.appendChild(item);
+    }
+    container.appendChild(card);
+  }
+  document.getElementById('d0').addEventListener('change', onDay1DateChanged);
+}
+initUI();
+
+// ========== 藍牙連線與通訊邏輯 ==========
+async function toggleConnect() {
+  if (bleDevice && bleDevice.gatt.connected) {
+    bleDevice.gatt.disconnect();
+    return;
+  }
+
+  try {
+    document.getElementById('bleStatusText').innerText = "連線中...";
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ name: 'SmartPillBox' }],
+      optionalServices: [SERVICE_UUID]
+    });
+
+    bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+    const server = await bleDevice.gatt.connect();
+    const service = await server.getPrimaryService(SERVICE_UUID);
+
+    rxCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID_RX);
+    txCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID_TX);
+
+    await txCharacteristic.startNotifications();
+    txCharacteristic.addEventListener('characteristicvaluechanged', onNotifyReceived);
+
+    document.getElementById('bleStatusText').innerText = "🟢 已成功連線至藥盒";
+    document.getElementById('bleStatusText').style.color = "#10b981";
+    document.getElementById('btnConnect').innerText = "斷開連線";
+
+    // 連線成功第一件事：自動傳送手機精準時間給 ESP32
+    syncPhoneTimeToESP32();
+
+  } catch (error) {
+    console.error("藍牙連線錯誤:", error);
+    onDisconnected();
+  }
+}
+
+function onDisconnected() {
+  document.getElementById('bleStatusText').innerText = "🔴 尚未連線藥盒";
+  document.getElementById('bleStatusText').style.color = "#ef4444";
+  document.getElementById('btnConnect').innerText = "🔍 搜尋並連接藥盒";
+  rxCharacteristic = null;
+  txCharacteristic = null;
+}
+
+// 接收 ESP32 回傳狀態
+function onNotifyReceived(event) {
+  const value = new TextDecoder().decode(event.target.value);
+  try {
+    const data = JSON.parse(value);
+    if (data.type === "status") {
+      document.getElementById('tolerance').value = data.tolerance;
+
+      data.slots.forEach((s, idx) => {
+        const box = document.getElementById(`slot-box-${idx}`);
+        const badge = document.getElementById(`badge-${idx}`);
+        const dInput = document.getElementById(`d${idx}`);
+        const tInput = document.getElementById(`t${idx}`);
+
+        if (dInput && tInput) {
+          dInput.value = s.date;
+          tInput.value = s.time;
+        }
+
+        box.className = 'slot-item';
+        if (s.taken) {
+          box.classList.add('taken');
+          badge.className = 'badge badge-taken';
+          badge.innerText = '已服藥 ✓';
+        } else if (s.overdue) {
+          box.classList.add('overdue');
+          badge.className = 'badge badge-overdue';
+          badge.innerText = '⚠️ 逾時未服藥！';
+        } else if (s.active) {
+          box.classList.add('alert');
+          badge.className = 'badge badge-alert';
+          badge.innerText = '服藥提醒中...';
+        } else {
+          badge.className = 'badge badge-pending';
+          badge.innerText = '排程等待中';
+        }
+      });
+    }
+  } catch (e) {
+    console.error("解析 ESP32 封包失敗", e);
+  }
+}
+
+// 將手機當下真實 UNIX 時間傳給 ESP32
+async function syncPhoneTimeToESP32() {
+  if (!rxCharacteristic) return;
+  // 取得手機本地時間的秒數（加上時區偏移換算）
+  const now = new Date();
+  const localEpoch = Math.floor(now.getTime() / 1000) - (now.getTimezoneOffset() * 60);
+
+  const payload = JSON.stringify({
+    cmd: "sync_time",
+    epoch: localEpoch
+  });
+  await rxCharacteristic.writeValue(new TextEncoder().encode(payload));
+}
+
+// 傳送設定
+async function sendScheduleToESP32() {
+  if (!rxCharacteristic) {
+    alert("請先點擊上方按鈕連接藥盒！");
+    return;
+  }
+
+  const slots = [];
+  for (let i = 0; i < 8; i++) {
+    slots.push({
+      date: document.getElementById(`d${i}`).value,
+      time: document.getElementById(`t${i}`).value
+    });
+  }
+
+  const payload = JSON.stringify({
+    cmd: "save_schedule",
+    tolerance: parseInt(document.getElementById('tolerance').value, 10),
+    slots: slots
+  });
+
+  await rxCharacteristic.writeValue(new TextEncoder().encode(payload));
+  alert("排程已成功寫入藥盒！");
+}
+
+// 重設新週期
+async function sendResetToESP32() {
+  if (!rxCharacteristic) {
+    alert("請先點擊上方按鈕連接藥盒！");
+    return;
+  }
+  if (!confirm("確定要重設為今日起算的新週期，並重置所有服藥紀錄嗎？")) return;
+
+  const payload = JSON.stringify({ cmd: "reset" });
+  await rxCharacteristic.writeValue(new TextEncoder().encode(payload));
+}
+</script>
+</body>
+</html>
