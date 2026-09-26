@@ -58,14 +58,38 @@
 
   .grid-days { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 20px; }
   @media(min-width: 600px) { .grid-days { grid-template-columns: 1fr 1fr; } }
+  
   .day-card {
     background: var(--card-bg);
     border-radius: 12px;
     padding: 16px;
     border: 1px solid #e2e8f0;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    transition: opacity 0.3s;
   }
-  .day-title { font-weight: 700; color: #334155; margin-bottom: 12px; border-bottom: 2px solid #f1f5f9; padding-bottom: 6px; }
+  .day-card.disabled {
+    opacity: 0.45;
+  }
+  .day-title {
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 12px;
+    border-bottom: 2px solid #f1f5f9;
+    padding-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .day-check-label {
+    font-size: 13px;
+    font-weight: normal;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+  }
+
   .slot-item {
     background: #f8fafc;
     border-radius: 8px;
@@ -83,6 +107,7 @@
   .badge-pending { background: #f1f5f9; color: #475569; }
   .badge-alert { background: #fef3c7; color: #92400e; }
   .badge-overdue { background: #fee2e2; color: #991b1b; }
+  .badge-disabled { background: #e2e8f0; color: #94a3b8; }
   .input-row { display: flex; gap: 6px; }
   input[type="date"], input[type="time"], input[type="number"] {
     border: 1px solid #cbd5e1;
@@ -153,7 +178,7 @@
     <span style="font-size: 13px; color: #64748b;">時間到達後超過</span>
     <input type="number" id="tolerance" min="1" max="60" value="1" style="width: 60px;">
     <span style="font-size: 13px; color: #64748b;">分鐘未服，將啟動警報</span>
-    <div class="hint-text">💡 提示：更改「第 1 天」日期時，系統會自動順延第 2~4 天日程！</div>
+    <div class="hint-text">💡 提示：可勾選/取消勾選指定天數；更改「第 1 天」日期時，系統會自動順延後續天數！</div>
   </div>
 
   <div class="grid-days" id="daysContainer"></div>
@@ -211,19 +236,43 @@ function onDay1DateChanged() {
   document.getElementById('d7').value = addDays(baseDate, 3);
 }
 
-function initUI() {
+function toggleDayEnable(day) {
+  const chk = document.getElementById(`day-chk-${day}`);
+  const card = document.getElementById(`day-card-${day}`);
+  const inputs = card.querySelectorAll('input[type="date"], input[type="time"]');
+
+  if (chk.checked) {
+    card.classList.remove('disabled');
+    inputs.forEach(i => i.disabled = false);
+  } else {
+    card.classList.add('disabled');
+    inputs.forEach(i => i.disabled = true);
+  }
+}
+
+// 建立 4 天介面
+function initUI(preserveValues = false) {
   const container = document.getElementById('daysContainer');
-  container.innerHTML = '';
   const today = new Date();
   const yyyy = today.getFullYear();
   const mm = String(today.getMonth() + 1).padStart(2, '0');
   const dd = String(today.getDate()).padStart(2, '0');
   const todayStr = `${yyyy}-${mm}-${dd}`;
 
+  container.innerHTML = '';
+
   for (let d = 0; d < 4; d++) {
     let card = document.createElement('div');
+    card.id = `day-card-${d}`;
     card.className = 'day-card';
-    card.innerHTML = `<div class="day-title">第 ${d+1} 天日程</div>`;
+    card.innerHTML = `
+      <div class="day-title">
+        <span>第 ${d+1} 天日程</span>
+        <label class="day-check-label">
+          <input type="checkbox" id="day-chk-${d}" checked onchange="toggleDayEnable(${d})"> 啟用此日
+        </label>
+      </div>
+    `;
     
     for (let t = 0; t < 2; t++) {
       let idx = d * 2 + t;
@@ -233,9 +282,10 @@ function initUI() {
       let item = document.createElement('div');
       item.id = `slot-box-${idx}`;
       item.className = 'slot-item';
+      // 已移除 LED 標記，純粹顯示「第 1 次」或「第 2 次」
       item.innerHTML = `
         <div class="slot-header">
-          <span>第 ${t+1} 次 (LED ${idx+1})</span>
+          <span>第 ${t+1} 次</span>
           <span id="badge-${idx}" class="badge badge-pending">排程等待中</span>
         </div>
         <div class="input-row">
@@ -247,6 +297,7 @@ function initUI() {
     }
     container.appendChild(card);
   }
+
   document.getElementById('d0').addEventListener('change', onDay1DateChanged);
 }
 initUI();
@@ -279,7 +330,7 @@ async function toggleConnect() {
     document.getElementById('bleStatusText').style.color = "#10b981";
     document.getElementById('btnConnect').innerText = "斷開連線";
 
-    // 連線成功：立即同步手機當下時間
+    // 連線後同步時間並觸發 ESP32 回傳已儲存設定
     syncPhoneTimeToESP32();
 
   } catch (error) {
@@ -296,10 +347,39 @@ function onDisconnected() {
   txCharacteristic = null;
 }
 
-// 接收輕量狀態: "S:0,1,2,3,0,0,0,0"
+// 接收 ESP32 封包
 function onNotifyReceived(event) {
   const text = new TextDecoder().decode(event.target.value);
-  if (text.startsWith("S:")) {
+
+  // 1. 回讀排程設定: CFG:tolerance|idx,en,YYYY-MM-DD,HH:MM
+  if (text.startsWith("CFG:")) {
+    const parts = text.substring(4).split('|');
+    const tol = parts[0];
+    const s = parts[1].split(',');
+    const idx = parseInt(s[0], 10);
+    const en = (s[1] === "1");
+    const dVal = s[2];
+    const tVal = s[3];
+
+    document.getElementById('tolerance').value = tol;
+    
+    const dInput = document.getElementById(`d${idx}`);
+    const tInput = document.getElementById(`t${idx}`);
+    if (dInput && tInput) {
+      dInput.value = dVal;
+      tInput.value = tVal;
+    }
+
+    // 更新第幾天的 checkbox 狀態
+    const day = Math.floor(idx / 2);
+    const chk = document.getElementById(`day-chk-${day}`);
+    if (chk) {
+      chk.checked = en;
+      toggleDayEnable(day);
+    }
+  }
+  // 2. 即時狀態碼更新: S:0,1,2,3,4,0,0,0
+  else if (text.startsWith("S:")) {
     const states = text.substring(2).split(',');
     states.forEach((st, idx) => {
       const box = document.getElementById(`slot-box-${idx}`);
@@ -307,7 +387,10 @@ function onNotifyReceived(event) {
       if (!box || !badge) return;
 
       box.className = 'slot-item';
-      if (st === "3") {
+      if (st === "4") {
+        badge.className = 'badge badge-disabled';
+        badge.innerText = '未啟用';
+      } else if (st === "3") {
         box.classList.add('taken');
         badge.className = 'badge badge-taken';
         badge.innerText = '已服藥 ✓';
@@ -327,7 +410,6 @@ function onNotifyReceived(event) {
   }
 }
 
-// 傳送精確時間字串
 async function syncPhoneTimeToESP32() {
   if (!rxCharacteristic) return;
   const now = new Date();
@@ -335,35 +417,39 @@ async function syncPhoneTimeToESP32() {
   await rxCharacteristic.writeValue(new TextEncoder().encode(timeMsg));
 }
 
-// 傳送排程（分段包裝，確保不超載）
+// 傳送排程與啟用天數
 async function sendScheduleToESP32() {
   if (!rxCharacteristic) {
     alert("請先點擊上方按鈕連接藥盒！");
     return;
   }
 
-  // 先同步最新時間
   await syncPhoneTimeToESP32();
 
   const tol = parseInt(document.getElementById('tolerance').value, 10);
   let payload = `SET:${tol}`;
 
-  for (let i = 0; i < 8; i++) {
-    const dVal = document.getElementById(`d${i}`).value;
-    const tVal = document.getElementById(`t${i}`).value;
-    payload += `|${i},${dVal},${tVal}`;
+  for (intDay = 0; intDay < 4; intDay++) {
+    const isEn = document.getElementById(`day-chk-${intDay}`).checked ? 1 : 0;
+    for (intT = 0; intT < 2; intT++) {
+      let i = intDay * 2 + intT;
+      const dVal = document.getElementById(`d${i}`).value;
+      const tVal = document.getElementById(`t${i}`).value;
+      payload += `|${i},${isEn},${dVal},${tVal}`;
+    }
   }
 
   await rxCharacteristic.writeValue(new TextEncoder().encode(payload));
-  alert("排程已成功同步並儲存至藥盒！");
+  alert("排程與啟用天數已成功寫入藥盒！");
 }
 
+// 重設新週期
 async function sendResetToESP32() {
   if (!rxCharacteristic) {
     alert("請先點擊上方按鈕連接藥盒！");
     return;
   }
-  if (!confirm("確定要重設為今日起算的新週期，並重置所有服藥紀錄嗎？")) return;
+  if (!confirm("確定要重設為今日起算的新週期，並重置所有服藥紀錄與時間嗎？")) return;
 
   await rxCharacteristic.writeValue(new TextEncoder().encode("RESET"));
   initUI();
