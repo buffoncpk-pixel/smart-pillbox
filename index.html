@@ -22,7 +22,7 @@
   }
   .container { max-width: 680px; margin: 0 auto; }
   .header {
-    background: linear-gradient(135deg, #1e40af, #16c783);
+    background: linear-gradient(135deg, #0e8a5b, #16c783);
     color: white;
     padding: 24px;
     border-radius: 16px;
@@ -108,7 +108,7 @@
     border: none;
     border-radius: 8px;
     cursor: pointer;
-    box-shadow: 0 4px 10px rgba(37,99,235,0.25);
+    box-shadow: 0 4px 10px rgba(22, 199, 131, 0.25);
   }
   .btn-submit:hover { background: #13aa6f; }
   .btn-reset {
@@ -140,7 +140,6 @@
     </div>
   </div>
 
-  <!-- 藍牙連線控制列 -->
   <div class="ble-bar">
     <div>
       <div style="font-size: 12px; color: #64748b;">裝置連線狀態</div>
@@ -164,16 +163,14 @@
 </div>
 
 <script>
-// ========== Web Bluetooth UUID 定義 ==========
 const SERVICE_UUID           = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-const CHARACTERISTIC_UUID_RX = "beb5483e-36e1-4688-b7f5-ea07361b26a8"; // 寫入 ESP32
-const CHARACTERISTIC_UUID_TX = "beb5483e-36e1-4688-b7f5-ea07361b26a9"; // 接收 Notify
+const CHARACTERISTIC_UUID_RX = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+const CHARACTERISTIC_UUID_TX = "beb5483e-36e1-4688-b7f5-ea07361b26a9";
 
 let bleDevice = null;
 let rxCharacteristic = null;
 let txCharacteristic = null;
 
-// 時鐘更新（使用本機/手機時間）
 function updateLocalClock() {
   const now = new Date();
   const weekDays = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
@@ -191,7 +188,6 @@ function updateLocalClock() {
 setInterval(updateLocalClock, 1000);
 updateLocalClock();
 
-// 日期加減計算
 function addDays(dateStr, days) {
   if (!dateStr) return '';
   const parts = dateStr.split('-');
@@ -215,7 +211,6 @@ function onDay1DateChanged() {
   document.getElementById('d7').value = addDays(baseDate, 3);
 }
 
-// 動態建立 8 格卡片
 function initUI() {
   const container = document.getElementById('daysContainer');
   container.innerHTML = '';
@@ -256,7 +251,6 @@ function initUI() {
 }
 initUI();
 
-// ========== 藍牙連線與通訊邏輯 ==========
 async function toggleConnect() {
   if (bleDevice && bleDevice.gatt.connected) {
     bleDevice.gatt.disconnect();
@@ -285,7 +279,7 @@ async function toggleConnect() {
     document.getElementById('bleStatusText').style.color = "#10b981";
     document.getElementById('btnConnect').innerText = "斷開連線";
 
-    // 連線成功第一件事：自動傳送手機精準時間給 ESP32
+    // 連線成功：立即同步手機當下時間
     syncPhoneTimeToESP32();
 
   } catch (error) {
@@ -302,89 +296,68 @@ function onDisconnected() {
   txCharacteristic = null;
 }
 
-// 接收 ESP32 回傳狀態
+// 接收輕量狀態: "S:0,1,2,3,0,0,0,0"
 function onNotifyReceived(event) {
-  const value = new TextDecoder().decode(event.target.value);
-  try {
-    const data = JSON.parse(value);
-    if (data.type === "status") {
-      document.getElementById('tolerance').value = data.tolerance;
+  const text = new TextDecoder().decode(event.target.value);
+  if (text.startsWith("S:")) {
+    const states = text.substring(2).split(',');
+    states.forEach((st, idx) => {
+      const box = document.getElementById(`slot-box-${idx}`);
+      const badge = document.getElementById(`badge-${idx}`);
+      if (!box || !badge) return;
 
-      data.slots.forEach((s, idx) => {
-        const box = document.getElementById(`slot-box-${idx}`);
-        const badge = document.getElementById(`badge-${idx}`);
-        const dInput = document.getElementById(`d${idx}`);
-        const tInput = document.getElementById(`t${idx}`);
-
-        if (dInput && tInput) {
-          dInput.value = s.date;
-          tInput.value = s.time;
-        }
-
-        box.className = 'slot-item';
-        if (s.taken) {
-          box.classList.add('taken');
-          badge.className = 'badge badge-taken';
-          badge.innerText = '已服藥 ✓';
-        } else if (s.overdue) {
-          box.classList.add('overdue');
-          badge.className = 'badge badge-overdue';
-          badge.innerText = '⚠️ 逾時未服藥！';
-        } else if (s.active) {
-          box.classList.add('alert');
-          badge.className = 'badge badge-alert';
-          badge.innerText = '服藥提醒中...';
-        } else {
-          badge.className = 'badge badge-pending';
-          badge.innerText = '排程等待中';
-        }
-      });
-    }
-  } catch (e) {
-    console.error("解析 ESP32 封包失敗", e);
+      box.className = 'slot-item';
+      if (st === "3") {
+        box.classList.add('taken');
+        badge.className = 'badge badge-taken';
+        badge.innerText = '已服藥 ✓';
+      } else if (st === "2") {
+        box.classList.add('overdue');
+        badge.className = 'badge badge-overdue';
+        badge.innerText = '⚠️ 逾時未服藥！';
+      } else if (st === "1") {
+        box.classList.add('alert');
+        badge.className = 'badge badge-alert';
+        badge.innerText = '服藥提醒中...';
+      } else {
+        badge.className = 'badge badge-pending';
+        badge.innerText = '排程等待中';
+      }
+    });
   }
 }
 
-// 將手機當下真實 UNIX 時間傳給 ESP32
+// 傳送精確時間字串
 async function syncPhoneTimeToESP32() {
   if (!rxCharacteristic) return;
-  // 取得手機本地時間的秒數（加上時區偏移換算）
   const now = new Date();
-  const localEpoch = Math.floor(now.getTime() / 1000) - (now.getTimezoneOffset() * 60);
-
-  const payload = JSON.stringify({
-    cmd: "sync_time",
-    epoch: localEpoch
-  });
-  await rxCharacteristic.writeValue(new TextEncoder().encode(payload));
+  const timeMsg = `T:${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}-${now.getHours()}-${now.getMinutes()}-${now.getSeconds()}`;
+  await rxCharacteristic.writeValue(new TextEncoder().encode(timeMsg));
 }
 
-// 傳送設定
+// 傳送排程（分段包裝，確保不超載）
 async function sendScheduleToESP32() {
   if (!rxCharacteristic) {
     alert("請先點擊上方按鈕連接藥盒！");
     return;
   }
 
-  const slots = [];
+  // 先同步最新時間
+  await syncPhoneTimeToESP32();
+
+  const tol = parseInt(document.getElementById('tolerance').value, 10);
+  let payload = `SET:${tol}`;
+
   for (let i = 0; i < 8; i++) {
-    slots.push({
-      date: document.getElementById(`d${i}`).value,
-      time: document.getElementById(`t${i}`).value
-    });
+    const dVal = document.getElementById(`d${i}`).value;
+    const tVal = document.getElementById(`t${i}`).value;
+    payload += `|${i},${dVal},${tVal}`;
   }
 
-  const payload = JSON.stringify({
-    cmd: "save_schedule",
-    tolerance: parseInt(document.getElementById('tolerance').value, 10),
-    slots: slots
-  });
-
   await rxCharacteristic.writeValue(new TextEncoder().encode(payload));
-  alert("排程已成功寫入藥盒！");
+  alert("排程已成功同步並儲存至藥盒！");
 }
 
-// 重設新週期
 async function sendResetToESP32() {
   if (!rxCharacteristic) {
     alert("請先點擊上方按鈕連接藥盒！");
@@ -392,8 +365,8 @@ async function sendResetToESP32() {
   }
   if (!confirm("確定要重設為今日起算的新週期，並重置所有服藥紀錄嗎？")) return;
 
-  const payload = JSON.stringify({ cmd: "reset" });
-  await rxCharacteristic.writeValue(new TextEncoder().encode(payload));
+  await rxCharacteristic.writeValue(new TextEncoder().encode("RESET"));
+  initUI();
 }
 </script>
 </body>
