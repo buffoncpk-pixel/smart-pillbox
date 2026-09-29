@@ -235,7 +235,7 @@ function initUI() {
       item.className = 'slot-item';
       item.innerHTML = `
         <div class="slot-header">
-          <span>第 ${t+1} 次 (LED ${idx+1})</span>
+          <span>第 ${t+1} 次</span>
           <span id="badge-${idx}" class="badge badge-pending">排程等待中</span>
         </div>
         <div class="input-row">
@@ -279,7 +279,6 @@ async function toggleConnect() {
     document.getElementById('bleStatusText').style.color = "#10b981";
     document.getElementById('btnConnect').innerText = "斷開連線";
 
-    // 連線成功：立即同步手機當下時間
     syncPhoneTimeToESP32();
 
   } catch (error) {
@@ -296,7 +295,6 @@ function onDisconnected() {
   txCharacteristic = null;
 }
 
-// 接收輕量狀態: "S:0,1,2,3,0,0,0,0"
 function onNotifyReceived(event) {
   const text = new TextDecoder().decode(event.target.value);
   if (text.startsWith("S:")) {
@@ -327,7 +325,6 @@ function onNotifyReceived(event) {
   }
 }
 
-// 傳送精確時間字串
 async function syncPhoneTimeToESP32() {
   if (!rxCharacteristic) return;
   const now = new Date();
@@ -335,14 +332,12 @@ async function syncPhoneTimeToESP32() {
   await rxCharacteristic.writeValue(new TextEncoder().encode(timeMsg));
 }
 
-// 傳送排程（分段包裝，確保不超載）
 async function sendScheduleToESP32() {
   if (!rxCharacteristic) {
     alert("請先點擊上方按鈕連接藥盒！");
     return;
   }
 
-  // 先同步最新時間
   await syncPhoneTimeToESP32();
 
   const tol = parseInt(document.getElementById('tolerance').value, 10);
