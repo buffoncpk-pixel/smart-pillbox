@@ -7,12 +7,9 @@
 <style>
   :root {
     --primary: #16c783;
-    --primary-dark: #13aa6f;
     --success: #10b981;
     --warning: #f59e0b;
     --danger: #ef4444;
-    --info: #3b82f6;
-    --info-dark: #2563eb;
     --card-bg: #ffffff;
     --text: #1f2937;
   }
@@ -24,8 +21,6 @@
     padding: 16px;
   }
   .container { max-width: 680px; margin: 0 auto; }
-  
-  /* 共用頭部 (圖一) */
   .header {
     background: linear-gradient(135deg, #0e8a5b, #16c783);
     color: white;
@@ -38,7 +33,6 @@
   .clock-box { font-size: 14px; opacity: 0.95; line-height: 1.6; }
   .clock-time { font-size: 28px; font-weight: bold; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
   
-  /* 第一版專用樣式 */
   .ble-bar {
     background: white;
     padding: 16px;
@@ -51,7 +45,7 @@
   }
   .ble-status { font-weight: bold; font-size: 14px; }
   .ble-btn {
-    background: var(--success);
+    background: #10b981;
     color: white;
     border: none;
     padding: 10px 18px;
@@ -62,23 +56,6 @@
   }
   .ble-btn:hover { background: #0e8a5b; }
 
-  .config-card {
-    background: var(--card-bg);
-    padding: 18px;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-    margin-bottom: 20px;
-  }
-  .config-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  
-  /* 第二版專用樣式 */
   .grid-days { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 20px; }
   @media(min-width: 600px) { .grid-days { grid-template-columns: 1fr 1fr; } }
   .day-card {
@@ -116,50 +93,34 @@
     background: white;
   }
   select { cursor: pointer; font-weight: 600; color: #334155; }
-  
-  /* 按鈕群組 */
+  .config-card {
+    background: var(--card-bg);
+    padding: 18px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 20px;
+  }
+  .config-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
   .btn-submit {
     width: 100%;
     background: var(--primary);
     color: white;
     font-size: 16px;
     font-weight: 600;
-    padding: 14px;
+    padding: 12px;
     border: none;
     border-radius: 8px;
     cursor: pointer;
     box-shadow: 0 4px 10px rgba(22, 199, 131, 0.25);
-    margin-bottom: 12px;
   }
-  .btn-submit:hover { background: var(--primary-dark); }
-  
-  .btn-outline {
-    width: 100%;
-    background: white;
-    color: var(--primary);
-    border: 2px solid var(--primary);
-    font-size: 15px;
-    font-weight: 600;
-    padding: 12px;
-    border-radius: 8px;
-    cursor: pointer;
-    margin-bottom: 12px;
-  }
-  .btn-outline:hover { background: #f0fdf4; }
-
-  .btn-info {
-    width: 100%;
-    background: var(--info);
-    color: white;
-    font-size: 14px;
-    padding: 12px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    margin-bottom: 12px;
-  }
-  .btn-info:hover { background: var(--info-dark); }
-
+  .btn-submit:hover { background: #13aa6f; }
   .btn-reset {
     width: 100%;
     background: #64748b;
@@ -169,17 +130,7 @@
     border: none;
     border-radius: 8px;
     cursor: pointer;
-  }
-  .btn-reset:hover { background: #475569; }
-
-  /* 視圖切換機制 */
-  #view1, #view2 {
-    animation: fadeIn 0.3s ease-in-out;
-  }
-  
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    margin-top: 10px;
   }
   @keyframes pulse {
     0% { transform: scale(1); }
@@ -190,7 +141,6 @@
 </head>
 <body>
 <div class="container">
-  <!-- 共用：圖一 (時鐘標題) -->
   <div class="header">
     <h1>💊 SmartPill 智慧聯網藥盒</h1>
     <div class="clock-box">
@@ -199,80 +149,44 @@
     </div>
   </div>
 
-  <!-- ================= 第一版：連線與基本設定 ================= -->
-  <div id="view1">
-    <!-- 圖二上：藍牙連線 -->
-    <div class="ble-bar">
+  <div class="ble-bar">
+    <div>
+      <div style="font-size: 12px; color: #64748b;">裝置連線狀態</div>
+      <div id="bleStatusText" class="ble-status" style="color: #ef4444;">🔴 尚未連線藥盒</div>
+    </div>
+    <button type="button" class="ble-btn" id="btnConnect" onclick="toggleConnect()">🔍 搜尋並連接藥盒</button>
+  </div>
+
+  <div class="config-card">
+    <div class="config-row">
+      <label style="font-weight: 600; font-size: 14px;">📅 服藥行程天數：</label>
       <div>
-        <div style="font-size: 12px; color: #64748b;">裝置連線狀態</div>
-        <div id="bleStatusText" class="ble-status" style="color: #ef4444;">🔴 尚未連線藥盒</div>
-      </div>
-      <button type="button" class="ble-btn" id="btnConnect" onclick="toggleConnect()">🔍 搜尋並連接藥盒</button>
-    </div>
-
-    <!-- 圖二下：天數與容許超時設定 -->
-    <div class="config-card">
-      <div class="config-row">
-        <label style="font-weight: 600; font-size: 14px;">📅 服藥行程天數：</label>
-        <div>
-          <select id="dayCountSelect" onchange="onDayCountChanged()">
-            <option value="1">1 天行程 (共 2 次服藥)</option>
-            <option value="2">2 天行程 (共 4 次服藥)</option>
-            <option value="3">3 天行程 (共 6 次服藥)</option>
-            <option value="4" selected>4 天行程 (共 8 次服藥)</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="config-row" style="margin-bottom: 0;">
-        <div>
-          <label style="font-weight: 600; font-size: 14px;">⏱️ 超時未服提醒：</label>
-          <span style="font-size: 13px; color: #64748b;">到達後超過</span>
-          <input type="number" id="tolerance" min="1" max="60" value="1" style="width: 50px;">
-          <span style="font-size: 13px; color: #64748b;">分鐘未服啟動警報</span>
-        </div>
+        <select id="dayCountSelect" onchange="onDayCountChanged()">
+          <option value="1">1 天行程 (共 2 次服藥)</option>
+          <option value="2">2 天行程 (共 4 次服藥)</option>
+          <option value="3">3 天行程 (共 6 次服藥)</option>
+          <option value="4" selected>4 天行程 (共 8 次服藥)</option>
+        </select>
       </div>
     </div>
 
-    <!-- 前往第二版按鈕 -->
-    <button type="button" class="btn-submit" onclick="switchView(2)">確定進入日程設定 ➔</button>
+    <div class="config-row" style="margin-bottom: 0;">
+      <div>
+        <label style="font-weight: 600; font-size: 14px;">⏱️ 超時未服提醒：</label>
+        <span style="font-size: 13px; color: #64748b;">到達後超過</span>
+        <input type="number" id="tolerance" min="1" max="60" value="1" style="width: 50px;">
+        <span style="font-size: 13px; color: #64748b;">分鐘未服將啟動警報</span>
+      </div>
+    </div>
   </div>
 
+  <div class="grid-days" id="daysContainer"></div>
 
-  <!-- ================= 第二版：詳細日程與進階操作 ================= -->
-  <div id="view2" style="display: none;">
-    
-    <button type="button" class="btn-outline" onclick="switchView(1)">🔙 返回上一頁修改天數</button>
-    
-    <!-- 圖三：對應天數的日程表 -->
-    <div class="grid-days" id="daysContainer"></div>
-
-    <!-- 儲存資料到 ESP32 -->
-    <button type="button" class="btn-submit" onclick="sendScheduleToESP32()">💾 傳送並儲存排程至藥盒</button>
-    
-    <!-- 萬一斷電重新連線 (與第一版連線功能相同，方便用家操作) -->
-    <button type="button" class="btn-info" onclick="toggleConnect()">🔌 萬一藥盒斷電：點此重新搜尋並連接</button>
-    
-    <!-- 重設週期 -->
-    <button type="button" class="btn-reset" onclick="sendResetToESP32()">🔄 重設全部日程時間與服藥狀態（新週期）</button>
-    
-  </div>
+  <button type="button" class="btn-submit" onclick="sendScheduleToESP32()">💾 傳送並儲存排程至藥盒</button>
+  <button type="button" class="btn-reset" onclick="sendResetToESP32()">🔄 重設全部日程時間與服藥狀態（新週期）</button>
 </div>
 
 <script>
-// ========== 版面切換邏輯 ==========
-function switchView(viewNumber) {
-  if (viewNumber === 1) {
-    document.getElementById('view1').style.display = 'block';
-    document.getElementById('view2').style.display = 'none';
-  } else {
-    document.getElementById('view1').style.display = 'none';
-    document.getElementById('view2').style.display = 'block';
-    onDayCountChanged(); // 進入時強制刷新一次格數顯示
-  }
-}
-
-// ========== 藍牙與核心邏輯 ==========
 const SERVICE_UUID           = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 const CHARACTERISTIC_UUID_RX = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 const CHARACTERISTIC_UUID_TX = "beb5483e-36e1-4688-b7f5-ea07361b26a9";
@@ -406,11 +320,6 @@ async function toggleConnect() {
     document.getElementById('btnConnect').innerText = "斷開連線";
 
     syncPhoneTimeToESP32();
-    
-    // 如果使用者在第二版按了重新連接，跳個通知讓他安心
-    if(document.getElementById('view2').style.display === 'block') {
-      alert("🟢 藥盒已重新連線，可繼續操作！");
-    }
 
   } catch (error) {
     console.error("藍牙連線錯誤:", error);
@@ -428,24 +337,7 @@ function onDisconnected() {
 
 function onNotifyReceived(event) {
   const text = new TextDecoder().decode(event.target.value);
-  
-  if (text.startsWith("CFG:")) {
-    const parts = text.substring(4).split('|');
-    const tol = parts[0];
-    const s = parts[1].split(',');
-    const idx = parseInt(s[0], 10);
-    const dVal = s[2];
-    const tVal = s[3];
-
-    document.getElementById('tolerance').value = tol;
-    const dInput = document.getElementById(`d${idx}`);
-    const tInput = document.getElementById(`t${idx}`);
-    if (dInput && tInput) {
-      dInput.value = dVal;
-      tInput.value = tVal;
-    }
-  }
-  else if (text.startsWith("S:")) {
+  if (text.startsWith("S:")) {
     const states = text.substring(2).split(',');
     states.forEach((st, idx) => {
       const box = document.getElementById(`slot-box-${idx}`);
@@ -453,9 +345,7 @@ function onNotifyReceived(event) {
       if (!box || !badge) return;
 
       box.className = 'slot-item';
-      if (st === "4") {
-        box.style.display = "none"; // 隱藏未啟用的狀態 (或後端處理)
-      } else if (st === "3") {
+      if (st === "3") {
         box.classList.add('taken');
         badge.className = 'badge badge-taken';
         badge.innerText = '已服藥 ✓';
@@ -484,7 +374,7 @@ async function syncPhoneTimeToESP32() {
 
 async function sendScheduleToESP32() {
   if (!rxCharacteristic) {
-    alert("🔴 請先確保藥盒已連線 (若斷電請點下方藍色按鈕重新連接)！");
+    alert("請先點擊上方按鈕連接藥盒！");
     return;
   }
 
@@ -496,28 +386,25 @@ async function sendScheduleToESP32() {
   let payload = `SET:${tol}`;
 
   for (let i = 0; i < 8; i++) {
-    const isEn = (i < activeSlots) ? 1 : 0;
     const dVal = document.getElementById(`d${i}`).value;
     const tVal = (i < activeSlots) ? document.getElementById(`t${i}`).value : "99:99";
-    payload += `|${i},${isEn},${dVal},${tVal}`;
+    payload += `|${i},${dVal},${tVal}`;
   }
 
   await rxCharacteristic.writeValue(new TextEncoder().encode(payload));
-  alert(`✅ 已成功將 ${activeDays} 天排程同步並儲存至藥盒！`);
+  alert(`已成功將 ${activeDays} 天排程同步並儲存至藥盒！`);
 }
 
 async function sendResetToESP32() {
   if (!rxCharacteristic) {
-    alert("🔴 請先確保藥盒已連線！");
+    alert("請先點擊上方按鈕連接藥盒！");
     return;
   }
-  if (!confirm("⚠️ 確定要重設為今日起算的新週期，並重置所有服藥紀錄嗎？")) return;
+  if (!confirm("確定要重設為今日起算的新週期，並重置所有服藥紀錄嗎？")) return;
 
   await rxCharacteristic.writeValue(new TextEncoder().encode("RESET"));
   document.getElementById('dayCountSelect').value = "4";
-  onDayCountChanged();
   initUI();
-  alert("🔄 藥盒已重設完畢！");
 }
 </script>
 </body>
