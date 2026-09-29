@@ -132,7 +132,6 @@
     cursor: pointer;
     margin-top: 10px;
   }
-  .hint-text { font-size: 12px; color: #64748b; margin-top: 6px; }
   @keyframes pulse {
     0% { transform: scale(1); }
     50% { transform: scale(1.01); box-shadow: 0 0 10px rgba(239,68,68,0.3); }
@@ -179,7 +178,6 @@
         <span style="font-size: 13px; color: #64748b;">分鐘未服將啟動警報</span>
       </div>
     </div>
-    <div class="hint-text">💡 提示：更改「第 1 天」日期時，系統會自動順延後續天數！</div>
   </div>
 
   <div class="grid-days" id="daysContainer"></div>
@@ -237,7 +235,6 @@ function onDay1DateChanged() {
   document.getElementById('d7').value = addDays(baseDate, 3);
 }
 
-// 切換天數顯示/隱藏
 function onDayCountChanged() {
   const count = parseInt(document.getElementById('dayCountSelect').value, 10);
   for (let d = 0; d < 4; d++) {
@@ -375,7 +372,6 @@ async function syncPhoneTimeToESP32() {
   await rxCharacteristic.writeValue(new TextEncoder().encode(timeMsg));
 }
 
-// 傳送排程（依據下拉選單的天數精準傳送）
 async function sendScheduleToESP32() {
   if (!rxCharacteristic) {
     alert("請先點擊上方按鈕連接藥盒！");
@@ -385,13 +381,13 @@ async function sendScheduleToESP32() {
   await syncPhoneTimeToESP32();
 
   const activeDays = parseInt(document.getElementById('dayCountSelect').value, 10);
-  const activeSlots = activeDays * 2; // 選 N 天對應 2N 格
+  const activeSlots = activeDays * 2;
   const tol = parseInt(document.getElementById('tolerance').value, 10);
   let payload = `SET:${tol}`;
 
   for (let i = 0; i < 8; i++) {
     const dVal = document.getElementById(`d${i}`).value;
-    const tVal = (i < activeSlots) ? document.getElementById(`t${i}`).value : "99:99"; // 未選天數填入無效時間避免誤觸
+    const tVal = (i < activeSlots) ? document.getElementById(`t${i}`).value : "99:99";
     payload += `|${i},${dVal},${tVal}`;
   }
 
